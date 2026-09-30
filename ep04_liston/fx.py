@@ -8,7 +8,8 @@ from PIL import Image
 
 VW, VH, FPS = 1920, 1080, 30
 SHAKE_SFX = {"hit": (18, 0.45, 0.08), "door_slam": (16, 0.5, 0.05), "door_bang": (14, 0.4, 0.05),
-             "stamp": (10, 0.3, 0.04), "boom": (20, 0.6, 0.08), "splash": (8, 0.4, 0.0)}
+             "stamp": (10, 0.3, 0.04), "boom": (20, 0.6, 0.08), "splash": (8, 0.4, 0.0),
+             "m_impact": (18, 0.5, 0.07), "m_thud": (16, 0.45, 0.06), "m_hit": (12, 0.35, 0.05), "m_stamp": (10, 0.3, 0.04), "m_punch": (9, 0.25, 0.03)}
 _rng = np.random.default_rng(11)
 
 
@@ -48,7 +49,8 @@ class SceneFX:
         self.snow = bool(opt.get("snow")) and not card
         self.embers = bool(opt.get("embers")) and not card
         self.shakes = []
-        for name, a in s.get("sfx", []):
+        for cue in s.get("sfx", []):
+            name, a = cue[0], cue[1]
             if name in SHAKE_SFX:
                 amp, d, p = SHAKE_SFX[name]; self.shakes.append((anchor(sc, a), amp, d, p))
         # 화면 글자: (PIL RGBA 전체 화면, 등장 시각, 스타일) → 글자 부분만 잘라 두고 중심 기준으로 키운다
@@ -176,10 +178,12 @@ class SceneFX:
             return (f * min(1, t / 0.4)).astype(np.uint8) if t < 0.4 else f
         if self.trans == "black":
             return (f * min(1, t / 0.3)).astype(np.uint8) if t < 0.3 else f
-        if t < 0.18:                                          # 확 다가오는 전환
-            w = t / 0.18; z = 1.07 - 0.07 * (0.5 - 0.5 * math.cos(math.pi * w))
+        if self.trans == "cut":
+            return f
+        if t < 0.25:                                          # 장면 시작: 살짝 다가오는 전환(2026-09-30 1.07→1.03, 흐림 줄임)
+            w = t / 0.25; z = 1.03 - 0.03 * (0.5 - 0.5 * math.cos(math.pi * w))
             g = _warp(f, z, VW / 2, VH / 2)
-            return cv2.GaussianBlur(g, (0, 0), 6 * (1 - w)) if w < 0.9 else g
+            return cv2.GaussianBlur(g, (0, 0), 2.5 * (1 - w)) if w < 0.8 else g
         return f
 
     def frame(self, i, view):

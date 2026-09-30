@@ -148,6 +148,11 @@ def scene(s):
 
 # 앞 장면을 참고하는 장면(ref_prev)은 앞 장면이 다 만들어진 뒤 순서대로
 first_pass = [s for s in SCENES if not s.get("ref_prev")]
+# 문장별 그림(plan.SHOTS): 장면 원래 그림이 아닌 새 그림만 만든다
+for _s in SCENES:
+    for _line, _id, _prompt, _opt in getattr(plan, "SHOTS", {}).get(_s["id"], []):
+        if _prompt:
+            first_pass.append(dict(id=_id, prompt=_prompt, dark=_opt.get("dark", _s.get("dark")), ref=_opt.get("ref")))
 with ThreadPoolExecutor({"agy": 3, "flow": 2}.get(MODE, 5)) as ex:   # flowkit 은 서버가 한 번에 1장씩 처리
     list(ex.map(scene, first_pass))
 for s in SCENES:

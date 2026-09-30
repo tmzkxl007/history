@@ -20,7 +20,7 @@ python tts.py              # 대본 줄마다 Typecast 녹음(1.1배, 앞뒤 0.0
 python img.py refs         # 주인공 기준 캐릭터
 python img.py all          # 장면 그림 (Google Flow 나노바나나2, 채널 그림체 기준 이미지 참고)
 python ../omni_video.py .  # plan 의 anim=(초, "움직임") 장면을 Flow Omni Flash 영상으로
-python sfx.py              # 효과음 합성(numpy)
+python ../mara_sfx.py .    # 효과음(마라하기 팩 → sfx/m_*.wav). 팩이 없으면 python sfx.py 합성음
 python build.py            # 장면 클립(효과) → 오디오 믹스 → 넷플릭스 규격 자막 → 최종 mp4
 python ../sub_check.py subs.ass           # 자막 규격 검사
 python ../thumbA.py . <그림id> <이름> "줄1|~빨강~|줄3" x0 y0 w   # 썸네일(채널 기본형)
@@ -39,6 +39,8 @@ python short.py <첫 장면> <끝 장면> <이름> "<위 제목>"            # �
 | 편 폴더 `build.py` | 타임라인·클립·오디오·자막·최종 인코딩 |
 | 편 폴더 `fx.py` | 장면 효과: AI 영상 대체·입체감·효과음 연동 흔들림·안개·글자 등장·전환 |
 | 편 폴더 `vfix.py` | AI 영상 색·선명도를 원본 그림에 맞춤 |
+| 편 폴더 `shots.py` | 문장마다 그림 바꾸기(plan.SHOTS) · 만화 기호(STICKERS: ! ? 💀 💢 땀 속도선 이름표 사람그래프 지도화살표) · 옛날 자료 액자(ARCHIVE) |
+| `mara_sfx.py` | 마라하기 효과음 팩에서 일반 효과음만 골라 음량 맞춤(게임·영화·노래 이름 붙은 것 제외, 팩 파일은 저장소에 없음) |
 | 편 폴더 `endcard_yt.py` | 마지막 좋아요·구독 버튼 애니메이션(직접 그림, 유튜브 로고 아님) |
 
 ## 준비물 (저장소에 없음)
@@ -50,3 +52,10 @@ python short.py <첫 장면> <끝 장면> <이름> "<위 제목>"            # �
 - **배경음악** (`<편>/bgm/`): 쇼팽 녹턴 퍼블릭 도메인 녹음(Musopen, Wikimedia Commons)
   `n20_csharp_minor.flac` · `n19_e_minor.flac` · `n04_f_major.flac` · `n13_c_minor.flac` · `n10_aflat_major.flac`
 - Python: numpy, opencv-python-headless, pillow, kiwipiepy, rembg[cpu] / ffmpeg, yt-dlp
+
+## 화면 규칙 (4편부터)
+- 그림은 문장마다 바꿔 한 장이 평균 3~4초 동안 나오게 한다(`plan.SHOTS`). 얼굴 클로즈업(`CU`)을 섞는다.
+- 카메라는 초당 0.8%(클로즈업 1%)만 다가간다. 같은 장면 안에서 그림이 바뀔 때는 컷으로 넘기고, 새 장면이 시작될 때만 살짝 다가간다.
+- 밝기 깜빡임, 먼지, 눈 내리는 효과는 쓰지 않는다.
+- 쇼츠의 끝 안내 문구는 y=1395에 둔다(아래쪽 약 400px은 쇼츠 화면의 제목과 버튼이 덮는다).
+- 옛날 사진·그림은 퍼블릭 도메인만 쓴다(예: 1845년경 Hill & Adamson이 찍은 리스턴 사진, Wikimedia Commons).

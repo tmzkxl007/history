@@ -124,7 +124,7 @@ dict(id="l22", sec="④",
             ("전설은 지어낸 이야기여도, 그 시대 수술실이 얼마나 위험했는지는 사실이었던 겁니다.", "normal")], post=0.3),
 
 # ⑤ 진짜 반전
-dict(id="l23", sec="⑤", bgm="n10", fx={"snow": True},
+dict(id="l23", sec="⑤", bgm="n10",
      prompt="A calendar-like winter scene outside University College Hospital in London in December 1846, snow falling, a crowd of students hurrying inside with excitement, a newspaper boy running.",
      lines=[("그런데 리스턴의 진짜 이야기는 따로 있습니다.", "normal"), ("1846년 12월 21일, 런던.", "normal"),
             ("바다 건너 미국에서 놀라운 소식이 막 도착했거든요.", "normal"),
@@ -164,3 +164,161 @@ dict(id="l31", sec="⑦",
 dict(id="l32", kind="card", bg="l31", blur=True, endcard=True,
      lines=[("영상이 재미있으셨다면 좋아요와 구독 눌러주세요.", "normal"), ("감사합니다.", "happy")]),
 ]
+
+
+# ---------------- 효과음: 마라하기 팩 (2026-09-30) — mara_sfx.py 가 sfx/m_*.wav 를 만든다 ----------------
+# (이름, 시각[, 음량배율]) · 시각 = "start" / "end" / ("line", i) / ("after", i) / ("line", i, 0.6)=i번째 줄 60% 지점
+SFX_MARA = {
+    "l02": [("m_swing1", ("line", 0, 0.4)), ("m_clack", ("after", 1))],
+    "l03": [("m_drumroll", ("line", 1), 1.1), ("m_impact", ("line", 2))],
+    "l04": [("m_whip", "start")],
+    "l05": [("m_shiver", ("line", 1, 0.3), 0.8), ("m_pop", ("line", 2, 0.2))],
+    "l06": [("m_yelp", ("line", 1, 0.45), 0.8)],
+    "l07": [("m_swish", ("line", 1)), ("m_down", ("line", 2, 0.6), 0.8)],
+    "l08": [("m_swing2", ("line", 0, 0.75)), ("m_appear", ("line", 1), 0.8)],
+    "l09": [("m_punch", ("line", 1, 0.5), 0.8), ("m_swing1", ("line", 2, 0.5))],
+    "l10": [("m_clumsy", ("line", 0, 0.9))],
+    "l11": [("m_register", "start", 0.8)],
+    "l12": [("m_ding2", ("line", 1, 0.6), 0.8), ("m_down", ("line", 2, 0.7), 0.8)],
+    "l13": [("m_runaway", ("line", 1, 0.5)), ("m_thud", ("line", 2, 0.2)), ("m_teong", ("line", 3, 0.75))],
+    "l14": [("m_swing2", ("line", 1, 0.55)), ("m_hit", ("line", 2, 0.45)), ("m_swish", ("line", 3, 0.6), 0.8)],
+    "l15": [("m_heok", ("line", 0, 0.15)), ("m_thud", ("line", 0, 0.55)), ("m_stamp", "end", 0.7)],
+    "l16": [("m_stamp", "end", 0.7)],
+    "l17": [("m_tada", ("line", 2))],
+    "l18": [("m_question", "start")],
+    "l19": [("m_discover", "start")],
+    "l20": [("m_typewriter", ("line", 1, 0.3), 1.1)],
+    "l23": [("m_sparkle", ("line", 2, 0.4), 0.8)],
+    "l24": [("m_choir", ("line", 0, 0.6), 1.2)],
+    "l25": [("m_clack", ("line", 2, 0.2)), ("m_swing1", ("line", 2, 0.6))],
+    "l26": [("m_question", ("after", 1)), ("m_giggle", ("line", 2))],
+    "l27": [("m_ding", ("after", 1))],
+    "l28": [("m_drop", ("line", 0, 0.5))],
+    "l29": [("m_bell", ("line", 1, 0.5), 0.8)],
+    "l30": [("m_tock", ("line", 0, 0.6))],
+}
+for _s in SCENES:
+    if _s["id"] in SFX_MARA:
+        _s["sfx"] = SFX_MARA[_s["id"]]
+    else:
+        _s["sfx"] = []                    # 합성 효과음은 쓰지 않는다(엔딩 좋아요·구독 클릭음만 그대로)
+
+
+# ---------------- 샘플(2026-09-30): 문장마다 그림 바꾸기 + 얼굴 클로즈업 + 만화 기호 + 정보 그림 (앞 1분) ----------------
+# SHOTS[장면] = [(시작 줄, 그림 id, 그림 설명 또는 None=장면 원래 그림, 옵션)]  — 줄이 바뀌는 순간 그림이 바뀐다
+CU = "Close-up shot: the face and upper body fill most of the frame, simple softly blurred background. "
+SHOTS = {
+    "l01": [(0, "l01a", "Establishing shot of a foggy 1840s London street at dawn: brick buildings, gas lamps, a horse carriage, "
+                        "and a big old hospital building with a columned entrance in the background, people in top hats walking.", {}),
+            (1, "l01", None, {}),
+            (2, "l01c", CU + "A terrified young Victorian man lying on a wooden operating table, wide awake with huge round eyes, "
+                        "sweating, leather straps across his chest and arms, looking up at the crowd above him.", {"dark": True}),
+            (3, "l01d", "Victorian gentlemen in top hats sitting in rows of theatre seats, eagerly watching like it is a show, one holds "
+                        "opera glasses, another leans forward excitedly, red velvet theatre curtains at the sides.", {"dark": True})],
+    "l05": [(0, "l05a", CU + "A nervous Victorian patient in a nightshirt stares at a tray of big old surgical tools (saws and knives) "
+                        "on a table next to his bed, gulping, sweat on his forehead.", {}),
+            (2, "l05", None, {})],
+    "l06": [(0, "l06", None, {}),
+            (1, "l06b", "Spectators in the steep wooden operating theatre wincing and covering their ears with both hands, "
+                        "eyes squeezed shut, some leaning back in shock.", {"dark": True})],
+    "l07": [(0, "l07a", CU + "A serious Victorian surgeon in a black coat holding up exactly one finger toward the viewer, "
+                        "eyebrows raised, as if saying 'only one thing matters'.", {}),
+            (1, "l07", None, {})],
+    "l08": [(0, "l08a", "Extreme close-up of only a very large hand in a dark green coat sleeve with a white shirt cuff, gripping a long "
+                        "gleaming amputation knife held up high, a bright sparkle of light on the blade; no face and no person visible, "
+                        "only the hand, sleeve and knife against a dark theatre background; no blood.", {"dark": True}),
+            (1, "l08", None, {}),
+            (2, "l08c", "Robert Liston, angry with a red face, arguing loudly with two older doctors in a Victorian hospital hallway, "
+                        "one doctor pointing at the open door telling him to leave.", {"ref": "liston"})],
+}
+# 만화 기호: (종류, 시각, x, y, 크기) — x·y 는 화면 비율. 종류: ! ? sweat skull anger speed shock tag:글자
+STICKERS = {
+    "l01c": [("!", ("line", 2, 0.45), 0.73, 0.22, 1.0)],
+    "l03":  [("tag:환자", ("line", 1, 0.05), 0.34, 0.50, 1.0), ("tag:조수", ("line", 1, 0.35), 0.50, 0.50, 1.0),
+             ("tag:구경꾼", ("line", 1, 0.65), 0.66, 0.50, 1.0)],
+    "l05a": [("!", ("line", 1, 0.2), 0.72, 0.2, 1.0)],
+    "l06b": [("!", ("line", 1, 0.3), 0.30, 0.25, 1.0), ("!", ("line", 1, 0.5), 0.72, 0.22, 0.8)],
+    "l07a": [("tag:딱 하나!", ("line", 0, 0.55), 0.26, 0.40, 1.1)],
+    "l07":  [("skull", ("line", 2, 0.5), 0.20, 0.40, 0.8)],
+    "l08a": [("speed", ("line", 0, 0.3), 0.50, 0.50, 1.0)],
+    "l08c": [("anger", ("line", 2, 0.35), 0.49, 0.36, 0.7)],
+}
+# 실제 옛날 자료(퍼블릭 도메인) 액자: 장면 → (파일, 시각, 설명)
+ARCHIVE = {"l08": ("archive/liston_portrait.jpg", ("line", 1, 0.1), "실제 사진 · 1845년경")}  # Hill & Adamson, 퍼블릭 도메인(Wikimedia Commons)
+
+# ---------------- 4편 전체(2026-09-30 사용자 "4편 이렇게 만들어 줘"): 나머지 장면도 문장마다 그림 ----------------
+# AI 영상 장면(l02 l14 l15 l25 l26)·카드·짧은 장면(l10 l11 l16 l18 l24)은 그대로. 기존 그림을 다시 쓰는 컷도 있다(l03 l06 l01c l08a)
+SHOTS.update({
+    "l09": [(0, "l09a", "Robert Liston standing next to an ordinary Victorian doctor who only reaches his chest, a tall wooden height-measuring "
+                        "board behind them with plain tick marks and no numbers, the ordinary doctor looking up at him in surprise.", {"ref": "liston"}),
+            (1, "l09", None, {})],
+    "l12": [(0, "l12", None, {}),
+            (1, "l12b", "Plain soft beige paper background with a subtle vintage texture and nothing else, empty.", {})],
+    "l13": [(0, "l13a", "Several Victorian doctors in a hospital corridor whispering gossip to each other behind their hands, amused and "
+                        "shocked faces, one covering his mouth to stop laughing.", {}),
+            (1, "l13", None, {}),
+            (2, "l13c", "Robert Liston dragging a crying patient in a nightshirt by the collar out of a broken wooden toilet door, "
+                        "splinters of the door on the floor, comedic cartoon scene.", {"ref": "liston"}),
+            (3, "l13d", CU + "A young Victorian surgical assistant with a horrified face, eyes popping and both hands over his mouth.", {})],
+    "l17": [(0, "l17a", "Three cute friendly cartoon ghosts floating side by side in a dark operating theatre, one in a patient's nightshirt, "
+                        "one in an assistant's apron, one in a gentleman's coat and top hat, waving shyly; spooky but funny, not scary.", {"dark": True}),
+            (1, "l17", None, {})],
+    "l19": [(0, "l19", None, {}),
+            (1, "l19b", CU + "A puzzled researcher with round glasses holding a magnifying glass over a big old ledger book with completely "
+                        "blank empty pages, scratching his head.", {}),
+            (2, "l19c", "Top-down view of a wooden desk with three old documents laid side by side: a thick hospital record book, "
+                        "an old folded newspaper, and a bundle of handwritten letters tied with string; all blank with no readable writing.", {})],
+    "l20": [(0, "l20", None, {}),
+            (1, "l20b", "A single thick hardcover book lying on a desk under a warm spotlight, plain dark red cover with no letters, "
+                        "dust sparkles in the light.", {}),
+            (2, "l20c", "The same old English author with round glasses and white hair laughing heartily and holding his belly, "
+                        "surrounded by stacks of funny comic novels with plain covers, in a cozy study.", {}),
+            (3, "l20d", "Two historians in modern clothes looking at an old book with skeptical faces, one raising an eyebrow, "
+                        "the other shaking his head, in a library.", {})],
+    "l21": [(0, "l21", None, {}),
+            (1, "l21b", CU + "Cute cartoon germs with tiny faces and little arms dancing on an old dirty surgical knife, "
+                        "green and purple round microbes, funny not gross, no blood.", {}),
+            (2, "l21", None, {})],
+    "l22": [(0, "l22", None, {}),
+            (1, "l22b", "A grim dirty Victorian operating room: stained wooden table, old saws and knives hanging on the wall, "
+                        "dirty aprons on hooks, a bucket of sawdust on the floor, dim candle light; no blood, no people.", {"dark": True})],
+    "l23": [(0, "l23a", CU + "Robert Liston with a thoughtful face, one hand on his chin, looking to the side.", {"ref": "liston"}),
+            (1, "l23", None, {}),
+            (2, "l23c", "An old parchment map of the North Atlantic Ocean: North America coast on the left, Britain on the right, "
+                        "a small sailing ship in the middle of the ocean; no text, no labels, no letters.", {}),
+            (3, "l23d", "1846 Boston: a dentist in a dark coat holding a glass ether inhaler with a tube to the mouth of a peacefully "
+                        "sleeping patient in a chair, doctors in a lecture hall watching amazed.", {})],
+    "l27": [(0, "l27", None, {}),
+            (1, "l27b", CU + "Robert Liston grinning widely and giving a big thumbs up; clean-shaven face with NO mustache and no beard, "
+                        "only his thick dark sideburns, exactly like the reference.", {"ref": "liston"})],
+    "l28": [(0, "l28", None, {}),
+            (1, "l08a", None, {}),
+            (2, "l28c", "A calm peaceful operating room in the 1840s: a patient sleeping peacefully with a relaxed smile, a surgeon working "
+                        "slowly and calmly, warm soft golden light from a window, a door wide open to bright light.", {})],
+    "l29": [(0, "l29", None, {}),
+            (1, "l29b", "A snowy Victorian cemetery at dusk: a single gravestone with no letters, a bouquet of flowers in front, "
+                        "a candle, quiet and sad.", {"dark": True})],
+    "l30": [(0, "l30", None, {}),
+            (1, "l30b", CU + "A shiny modern stainless steel surgical clamp (hemostat) lying on a blue surgical cloth next to other tools, "
+                        "clean hospital light.", {})],
+    "l31": [(0, "l03", None, {}),
+            (1, "l06", None, {}),
+            (2, "l01c", None, {}),
+            (3, "l31", None, {})],
+})
+
+STICKERS.update({
+    "l09a": [("tag:키 190cm", ("line", 0, 0.35), 0.40, 0.10, 1.0)],
+    "l12b": [("people:10:1:리스턴", ("line", 1, 0.45), 0.50, 0.42, 1.0), ("people:4:1:다른 병원", ("line", 2, 0.45), 0.375, 0.64, 1.0)],
+    "l13c": [("!", ("line", 2, 0.45), 0.90, 0.40, 0.8)],
+    "l13d": [("!", ("line", 3, 0.4), 0.73, 0.25, 1.0)],
+    "l17a": [("tag:환자", ("line", 0, 0.30), 0.375, 0.14, 0.9), ("tag:조수", ("line", 0, 0.50), 0.515, 0.14, 0.9),
+             ("tag:구경꾼", ("line", 0, 0.70), 0.645, 0.14, 0.9)],
+    "l19b": [("?", ("line", 1, 0.4), 0.64, 0.15, 0.9)],
+    "l19c": [("tag:없음", ("line", 2, 0.10), 0.19, 0.12, 1.0), ("tag:없음", ("line", 2, 0.40), 0.50, 0.12, 1.0),
+             ("tag:없음", ("line", 2, 0.70), 0.79, 0.12, 1.0)],
+    "l20c": [("tag:코미디 작가!", ("line", 2, 0.5), 0.27, 0.20, 1.0)],
+    "l20d": [("?", ("line", 3, 0.5), 0.47, 0.13, 0.9)],
+    "l23c": [("arrow:0.20,0.50,0.83,0.30", ("line", 2, 0.35), 0, 0, 1.0), ("tag:보스턴", ("line", 2, 0.15), 0.17, 0.62, 1.0),
+             ("tag:런던", ("line", 2, 0.60), 0.86, 0.42, 1.0)],
+})

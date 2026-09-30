@@ -14,11 +14,14 @@ SW, SH = 1080, 1920
 IW, IH = 1080, 608                  # 가운데 16:9 그림
 IY = 560                            # 그림 위쪽 y
 SUB_Y = IY + IH + 150               # 자막 줄 가운데 근처
+CTA_Y = 1395                        # 끝 안내 문구 위쪽 y — 쇼츠 화면 아래 약 400px 은 제목·채널명·구독 버튼이 덮는다(2026-09-30 1560→1395)
 TAIL = 0.6
 
 ids = [sc["s"]["id"] for sc in b.tl]
 sc0, sc1 = b.tl[ids.index(first)], b.tl[ids.index(last)]
 t0 = sc0["start"]; t1 = sc1["lines"][-1]["end"] + TAIL if sc1["lines"] else sc1["end"]
+# 2026-09-30: 꼬리가 다음 장면(제목 카드·효과음)으로 넘어가지 않게 영상·소리는 이 장면 끝에서 자르고 마지막 화면을 멈춰 채운다
+tv = min(t1, sc1["end"] - 0.05); pad = t1 - tv
 dur = t1 - t0
 OUT = W / "shorts"; OUT.mkdir(exist_ok=True)
 print(f"구간 {t0:.2f}~{t1:.2f}s = {dur:.1f}s")
@@ -36,8 +39,8 @@ top.save(OUT / "_top.png")
 cta = Image.new("RGBA", (SW, SH), (0, 0, 0, 0)); d = ImageDraw.Draw(cta)
 f2 = ImageFont.truetype(JAL, 54); txt = "전체 이야기는 채널에서 ▶"
 tw = d.textlength(txt, font=f2)
-d.rounded_rectangle([(SW - tw) / 2 - 36, 1560, (SW + tw) / 2 + 36, 1560 + 92], 24, fill=(200, 30, 35, 235))
-d.text(((SW - tw) / 2, 1572), txt, font=f2, fill="white")
+d.rounded_rectangle([(SW - tw) / 2 - 36, CTA_Y, (SW + tw) / 2 + 36, CTA_Y + 92], 24, fill=(200, 30, 35, 235))
+d.text(((SW - tw) / 2, CTA_Y + 12), txt, font=f2, fill="white")
 cta.save(OUT / "_cta.png")
 
 # 2) 자막: 롱폼 자막 중 이 구간 것만, 세로 화면 위치로
@@ -64,20 +67,20 @@ json.dump([[round(e[0] - t0, 3), round(min(e[1], t1) - t0, 3), e[2], e[3]] for e
 fdir = (W / "fonts").as_posix().replace(":", "\\:")
 assp = (OUT / f"{name}.ass").as_posix().replace(":", "\\:")
 cta_t = max(dur - 4.0, 0)
-fc = (f"[0:v]split=2[a][b];"
+fc = (f"[0:v]tpad=stop_mode=clone:stop_duration={pad:.3f},split=2[a][b];"
       f"[a]scale={SW}:{SH}:force_original_aspect_ratio=increase,crop={SW}:{SH},boxblur=28:2,eq=brightness=-0.18[bg];"
       f"[b]scale={IW}:{IH}[fg];"
       f"[bg][fg]overlay=0:{IY}[v1];"
       f"[v1][1:v]overlay=0:0[v2];"
       f"[2:v]format=rgba,fade=in:st={cta_t:.2f}:d=0.4:alpha=1[c];[v2][c]overlay=0:0[v3];"
       f"[v3]ass='{assp}':fontsdir='{fdir}',fade=in:st=0:d=0.25[v]")
-a_fc = f"[3:a]atrim={t0:.3f}:{t1:.3f},asetpts=PTS-STARTPTS,afade=in:d=0.15,afade=out:st={dur - 0.5:.2f}:d=0.5,loudnorm=I=-14:TP=-1.5:LRA=11[a]"
+a_fc = f"[3:a]atrim={t0:.3f}:{tv:.3f},asetpts=PTS-STARTPTS,apad=pad_dur={pad:.3f},afade=in:d=0.15,afade=out:st={dur - 0.5:.2f}:d=0.5,loudnorm=I=-14:TP=-1.5:LRA=11[a]"
 out = OUT / f"{name}.mp4"
-b.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t0:.3f}", "-t", f"{dur:.3f}", "-i", str(W / "video_raw.mp4"),
+b.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{t0:.3f}", "-t", f"{tv - t0:.3f}", "-i", str(W / "video_raw.mp4"),
        "-loop", "1", "-t", f"{dur:.3f}", "-i", str(OUT / "_top.png"),
        "-loop", "1", "-t", f"{dur:.3f}", "-i", str(OUT / "_cta.png"),
        "-i", str(W / "mix.wav"),
        "-filter_complex", fc + ";" + a_fc, "-map", "[v]", "-map", "[a]",
        "-r", "30", "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p",
-       "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", "-t", f"{dur:.3f}", str(out)])
+       "-c:a", "aac", "-b:a", "256k", "-ar", "48000", "-movflags", "+faststart", "-t", f"{dur:.3f}", str(out)])
 print("완료", out)

@@ -36,3 +36,8 @@ settings.bak
 
 # 폰트: 잘난체(여기어때)는 라이선스상 재배포 금지 — README 의 안내대로 각자 받는다
 fonts/
+
+# 작업 중 백업(이전 버전은 git 기록에 있음)
+*_before_mara.py
+*_before_shots.py
+archive/

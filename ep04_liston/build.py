@@ -57,6 +57,8 @@ def anchor(sc, a):
     if a == "end":
         # 뒤 여백이 없으니 마지막 줄 끝나기 0.6초 전에 띄운다
         return max(L[-1]["start"], L[-1]["end"] - 0.6) - sc["start"] if L else 0.3
+    if len(a) == 3:                     # ("line", i, 0.6) = i번째 줄의 60% 지점
+        return L[a[1]]["start"] + (L[a[1]]["end"] - L[a[1]]["start"]) * a[2] - sc["start"]
     kind, i = a
     return (L[i]["start"] if kind == "line" else L[i]["end"]) - sc["start"]
 
@@ -315,7 +317,9 @@ def make_clip(k, sc):
     if out.exists() and (ONLY is None or sid not in ONLY):
         src = IMG / f"{s.get('bg') or s.get('img_from', sid)}.png"
         needs_img = s.get("kind") != "graph" and not (s.get("kind") == "card" and not s.get("bg"))
-        if not needs_img or (src.exists() and src.stat().st_mtime < out.stat().st_mtime):
+        shot_new = any((IMG / f"{iid}.png").exists() and (IMG / f"{iid}.png").stat().st_mtime > out.stat().st_mtime
+                       for _, iid, *_ in getattr(plan, "SHOTS", {}).get(sid, []))
+        if not shot_new and (not needs_img or (src.exists() and src.stat().st_mtime < out.stat().st_mtime)):
             return out
     frames = int(round(dur * FPS))
     for old in CL.glob(f"{k:03d}_{sid}_*"):
@@ -333,49 +337,102 @@ def make_clip(k, sc):
             cur = f"v{j}"
     else:
         # 흔들림 방지: zoompan(정수 반올림으로 프레임마다 ±0.5px 떨림) 대신 OpenCV 소수점 변환으로 직접 프레임을 만든다
-        src = cv2.cvtColor(np.asarray(base_image(sc).resize((VW, VH), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
-        z0, z1 = (1.0, 1.07) if k % 2 == 0 else (1.07, 1.0)
-        dx = [0, 1, -1][k % 3]
-        L = sc["lines"]
-        # 그림 수 절감: 9초 넘는 장면은 문장 경계에서 같은 그림의 부분 확대 컷으로 한 번 바꾼다
-        n1 = None
-        if dur > 9 and len(L) >= 2:
-            mid = dur / 2
-            cut = min((l["start"] - sc["start"] for l in L[1:]), key=lambda x: abs(x - mid))
-            n1 = int(round(cut * FPS))
-        fx = [0.2, 0.8, 0.5][k % 3]
-        ease = lambda u: 0.5 - 0.5 * math.cos(math.pi * min(max(u, 0), 1))
-
-        def view(i):
-            if n1 and i >= n1:                       # 두 번째 컷: 부분 확대
-                u = ease((i - n1) / max(frames - n1 - 1, 1)); z = 1.35 + 0.07 * u
-                w, h = VW / z, VH / z
-                return z, (VW - w) * fx + w / 2, (VH - h) * 0.4 + h / 2
-            span = (n1 or frames) - 1
-            u = ease(i / max(span, 1))
-            if n1:
-                z = 1.0 + 0.06 * u; m = 0.0
-            else:
-                z = z0 + (z1 - z0) * u; m = (VW - VW / z) / 2
-            return z, VW / 2 + dx * 0.7 * m * (2 * u - 1), VH / 2
-
-        # 장면 효과(fx.py): AI 영상 · 입체감 · 흔들림 · 분위기 · 글자 등장 · 전환 — 글자와 전환도 여기서 그린다
-        sys.path.insert(0, str(W)); import fx as FX
-        ovl = []
-        for j, (text, style, a) in enumerate(s.get("ov", [])):
-            p = OV / f"{sid}_ov{j}.png"; overlay_png(text, style, p)
-            ovl.append((Image.open(p).convert("RGBA"), anchor(sc, a), style))
+        shots = getattr(plan, "SHOTS", {}).get(sid)
+        sys.path.insert(0, str(W)); import fx as FX, shots as SH
         prev_sec = next((tl[q]["s"].get("sec") for q in range(k - 1, -1, -1) if tl[q]["s"].get("sec")), None)
-        F = FX.SceneFX(W, sc, src, frames, anchor, ovl, prev_sec, k == 0)
         basemp4 = OV / f"{sid}_motion.mp4"
         pr = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{VW}x{VH}",
                                "-r", str(FPS), "-i", "-", "-c:v", "libx264", "-preset", "veryfast", "-crf", "12",
                                "-pix_fmt", "yuv420p", str(basemp4)], stdin=subprocess.PIPE)
-        for i in range(frames):
-            fr = F.frame(i, view)
-            if s.get("endcard"):
-                fr = endcard_frame(fr, i / FPS, sc)
-            pr.stdin.write(fr.tobytes())
+
+        def extras(sc2, s2, lo, hi):
+            """이 컷에 뜰 글자·만화 기호·옛날 자료(시각이 컷 안에 있는 것만)"""
+            out = []
+            for j, (text, style, a) in enumerate(s.get("ov", [])):
+                t0 = anchor(sc2, a)
+                if lo <= t0 < hi:
+                    pth = OV / f"{sid}_ov{j}.png"; overlay_png(text, style, pth)
+                    out.append((Image.open(pth).convert("RGBA"), t0, style))
+            for kind, a, x, y, sc_ in getattr(plan, "STICKERS", {}).get(s2["id"], []):
+                t0 = anchor(sc2, a)
+                if lo <= t0 < hi:
+                    out.append((SH.sticker(kind, x, y, sc_, JAL), t0, "stamp" if kind == "!" else "pop"))
+            ar = getattr(plan, "ARCHIVE", {}).get(sid)
+            if ar:
+                t0 = anchor(sc2, ar[1])
+                if lo <= t0 < hi:
+                    out.append((SH.archive(W / ar[0], ar[2], JAL), t0, "name"))
+            return out
+
+        if shots:
+            # 문장마다 그림 바꾸기(2026-09-30 샘플): 줄이 시작하는 순간 새 그림으로 컷, 컷마다 확 다가오는 전환
+            L = sc["lines"]
+            cuts = [0] + [int(round((L[ln]["start"] - sc["start"]) * FPS)) for ln, *_ in shots[1:]] + [frames]
+            ease = lambda u: 0.5 - 0.5 * math.cos(math.pi * min(max(u, 0), 1))
+            for j, (ln, iid, prompt, opt) in enumerate(shots):
+                s2 = dict(s)
+                if iid != sid:
+                    s2.update(id=iid, img_from=iid, prompt=prompt, ref=opt.get("ref"), dark=opt.get("dark", s.get("dark")))
+                    s2.pop("anim", None)
+                f0, f1 = cuts[j], cuts[j + 1]; nfr = f1 - f0
+                sc2 = dict(sc, s=s2, start=sc["start"] + f0 / FPS)
+                src = cv2.cvtColor(np.asarray(base_image(sc2).resize((VW, VH), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
+                close = bool(prompt and prompt.startswith("Close-up"))
+                kk = k + j
+
+                # 2026-09-30 사용자 "화면이 막 움직인다": 컷이 짧아져도 움직임 폭을 그대로 두면 2~3배 빨라진다 →
+                # 컷 길이에 비례해 초당 0.8%(클로즈업 1%)만 움직인다. 방향은 한쪽(다가가기)으로만
+                amt = min(0.06, (0.010 if close else 0.008) * nfr / FPS)
+
+                def view(i, nfr=nfr, close=close, kk=kk, amt=amt):
+                    u = ease(i / max(nfr - 1, 1))
+                    z = 1.02 + amt * u
+                    if close:
+                        return z, VW / 2, VH * (0.5 - 0.3 * amt * u)
+                    m = (VW - VW / z) / 2; dx = [1, -1][kk % 2]
+                    return z, VW / 2 + dx * 0.5 * m * u, VH / 2
+
+                lo = -1e9 if j == 0 else -0.05
+                F = FX.SceneFX(W, sc2, src, nfr, anchor, extras(sc2, s2, lo, nfr / FPS), prev_sec if j == 0 else s.get("sec"), k == 0 and j == 0)
+                if j > 0:
+                    F.trans = "cut"                           # 같은 장면 안의 그림 바꾸기는 깔끔한 컷
+                for i in range(nfr):
+                    pr.stdin.write(F.frame(i, view).tobytes())
+        else:
+            src = cv2.cvtColor(np.asarray(base_image(sc).resize((VW, VH), Image.LANCZOS)), cv2.COLOR_RGB2BGR)
+            amt = min(0.07, 0.008 * dur)                 # 짧은 장면도 초당 0.8% 넘게 움직이지 않게(2026-09-30)
+            z0, z1 = (1.0, 1.0 + amt) if k % 2 == 0 else (1.0 + amt, 1.0)
+            dx = [0, 1, -1][k % 3]
+            L = sc["lines"]
+            # 그림 수 절감: 9초 넘는 장면은 문장 경계에서 같은 그림의 부분 확대 컷으로 한 번 바꾼다
+            n1 = None
+            if dur > 9 and len(L) >= 2:
+                mid = dur / 2
+                cut = min((l["start"] - sc["start"] for l in L[1:]), key=lambda x: abs(x - mid))
+                n1 = int(round(cut * FPS))
+            fx = [0.2, 0.8, 0.5][k % 3]
+            ease = lambda u: 0.5 - 0.5 * math.cos(math.pi * min(max(u, 0), 1))
+
+            def view(i):
+                if n1 and i >= n1:                       # 두 번째 컷: 부분 확대
+                    u = ease((i - n1) / max(frames - n1 - 1, 1)); z = 1.35 + 0.07 * u
+                    w, h = VW / z, VH / z
+                    return z, (VW - w) * fx + w / 2, (VH - h) * 0.4 + h / 2
+                span = (n1 or frames) - 1
+                u = ease(i / max(span, 1))
+                if n1:
+                    z = 1.0 + 0.06 * u; m = 0.0
+                else:
+                    z = z0 + (z1 - z0) * u; m = (VW - VW / z) / 2
+                return z, VW / 2 + dx * 0.7 * m * (2 * u - 1), VH / 2
+
+            # 장면 효과(fx.py): AI 영상 · 입체감 · 흔들림 · 분위기 · 글자 등장 · 전환 — 글자·만화 기호·옛날 자료도 여기서 그린다
+            F = FX.SceneFX(W, sc, src, frames, anchor, extras(sc, s, -1e9, 1e9), prev_sec, k == 0)
+            for i in range(frames):
+                fr = F.frame(i, view)
+                if s.get("endcard"):
+                    fr = endcard_frame(fr, i / FPS, sc)
+                pr.stdin.write(fr.tobytes())
         pr.stdin.close(); pr.wait()
         inputs += ["-i", str(basemp4)]
         filt.append("[0:v]format=yuv420p[v0]")
@@ -426,9 +483,10 @@ def build_audio():
             for tt in (tl_, ts_):
                 x = read_wav(SFX / "click.wav", 2); i = int((sc["start"] + tt) * SR)
                 fx[i:i + len(x)] += x[: n - i] * 0.7
-        for name, a in sc["s"].get("sfx", []):
+        for cue in sc["s"].get("sfx", []):          # (이름, 시각[, 음량배율])
+            name, a, g = (tuple(cue) + (1.0,))[:3]
             x = read_wav(SFX / f"{name}.wav", 2); i = int((sc["start"] + anchor(sc, a)) * SR)
-            fx[i:i + len(x)] += x[: n - i] * 0.55
+            fx[i:i + len(x)] += x[: n - i] * 0.55 * g
     # 배경음악 구간
     regions, cur, cs = [], None, 0.0
     for sc in tl:
@@ -465,7 +523,7 @@ def build_audio():
     bg *= gain[:, None].astype(np.float32)
     write_wav(W / "mix_nar.wav", nar); write_wav(W / "mix_fx.wav", fx); write_wav(W / "mix_bg.wav", bg)
     run(["ffmpeg", "-y", "-v", "error", "-i", str(W / "mix_nar.wav"), "-i", str(W / "mix_fx.wav"), "-i", str(W / "mix_bg.wav"),
-         "-filter_complex", "[0][1][2]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11[a]", "-map", "[a]",
+         "-filter_complex", "[0][1][2]amix=inputs=3:normalize=0,loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.72:level=false[a]", "-map", "[a]",
          "-ar", str(SR), str(W / "mix.wav")])
 
 
@@ -656,7 +714,7 @@ if __name__ == "__main__":
     run(["ffmpeg", "-y", "-v", "error", "-i", str(W / "video_raw.mp4"), "-i", str(W / "mix.wav"),
          "-vf", f"ass='{ass}':fontsdir='{fdir}'", "-map", "0:v", "-map", "1:a",
          "-c:v", "libx264", "-preset", "medium", "-crf", "19", "-pix_fmt", "yuv420p", "-r", str(FPS),
-         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-shortest", str(out)])
+         "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", "-shortest", str(out)])
     # 완성본은 덮어쓰지 않고 버전으로 남긴다: versions/v번호_그림방식.mp4
     vd = W / "versions"; vd.mkdir(exist_ok=True)
     n = len(list(vd.glob("v*.mp4"))) + 1
