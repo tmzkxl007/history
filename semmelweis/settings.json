@@ -1,0 +1,4 @@
+{
+ "image_mode": "original",
+ "_설명": "그림 방식: z-image | lite | mix | original(1편 nano-banana). 바꾸면 img_<방식>/ 폴더에 따로 생성되고 기존 그림은 그대로 남는다"
+}
